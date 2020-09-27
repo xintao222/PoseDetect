@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/../ClassificationDemo/.idea/ClassificationDemo.iml" filepath="$PROJECT_DIR$/../ClassificationDemo/.idea/ClassificationDemo.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../PoseRecognition/.idea/PoseRecognition.iml" filepath="$PROJECT_DIR$/../PoseRecognition/.idea/PoseRecognition.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../SAD0908/.idea/SAD0908.iml" filepath="$PROJECT_DIR$/../SAD0908/.idea/SAD0908.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/alphapose_old.iml" filepath="$PROJECT_DIR$/.idea/alphapose_old.iml" />
+    </modules>
+  </component>
+</project>
