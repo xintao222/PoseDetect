@@ -39,7 +39,13 @@ class WebcamLoader:
         # initialize the file video stream along with the boolean
         # used to indicate if the thread should be stopped or not
         # self.stream = cv2.VideoCapture('http://ivi.bupt.edu.cn/hls/cctv5phd.m3u8')
-        self.stream = cv2.VideoCapture(int(webcam))
+        # 扩展功能，添加对视频流的读取功能。
+        if isinstance(webcam, str):
+            self.stream = cv2.VideoCapture(webcam)
+        elif isinstance(webcam, int):
+            self.stream = cv2.VideoCapture(int(webcam))
+        else:
+            self.stream = None
         assert self.stream.isOpened(), 'Cannot capture source'
         self.stopped = False
         # initialize the queue used to store frames read from
@@ -354,7 +360,6 @@ class WebcamDetectionLoader:
     def stop(self):
         # indicate that the thread should be stopped
         self.stopped = True
-
 
 
 class DataWriter:

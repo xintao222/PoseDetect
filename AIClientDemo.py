@@ -4,6 +4,9 @@ from clientdemo.DataModel import *
 import clientdemo.HttpHelper as HttpHelper
 import time
 
+# 获取或设置本机IP地址信息
+local_ip = '192.168.1.60'
+
 ages = {}  # 老人字典
 
 
@@ -24,21 +27,18 @@ def pose_detect_with_video(video_url, aged_id):
         use_aged.isalarm = False
 
 
-# 获取本机需要识别的摄像头视频地址信息
-local_ip = '192.168.199.224'
-local_ip = '192.168.1.60'
 # 拼接url，参考接口文档
 get_current_server_url = Conf.Urls.ServerInfoUrl + "/GetServerInfo?ip=" + local_ip
-print(get_current_server_url)
+print(f'get {get_current_server_url}')
 
 current_server = HttpHelper.get_items(get_current_server_url)
-print(current_server)
+# print(current_server)
 
 for camera in current_server.cameraInfos:  # 遍历本服务器需要处理的摄像头
-    print(f'摄像头视频地址：{camera.videoAddress}')
+    print(f'do_with camera video url：{camera.videoAddress}')
 
     for aged in camera.roomInfo.agesInfos:  # 遍历本摄像头所在房间的老人信息
-        print(f'被监控人：{aged.name}')
+        print(f'do_with aged name：{aged.name}')
 
         ages[aged.id] = PoseInfo(agesInfoId=aged.id, date=time.strftime('%Y-%m-%dT00:00:00', time.localtime()),
                                  timeStand=0, timeSit=0, timeLie=0, timeDown=0, timeOther=0)

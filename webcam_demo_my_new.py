@@ -27,6 +27,7 @@ import time
 from pPose_nms import write_json
 
 from align import AlignPoints
+from threading import Thread
 
 args = opt
 args.dataset = 'coco'
@@ -54,6 +55,11 @@ class NeuralNet(nn.Module):
         out = self.relu(self.fc2(out))
         out = self.fc3(out)
         return out
+
+
+def pose_detect_with_video(aged_id, classidx):
+    use_aged = ages[aged_id]
+
 
 
 def save_db(pose_info, classidx):
@@ -119,6 +125,13 @@ class ParsePoseDemo:
         self.pose_reg_model = pos_reg_model
         self.save_video = save_video
 
+    def start(self):
+        # start a thread to read frames from the file video stream
+        t = Thread(target=self.parse, args=())
+        t.daemon = True
+        t.start()
+        return self
+
     def parse(self):
         if not os.path.exists(self.output_path):
             os.mkdir(self.output_path)
@@ -126,7 +139,6 @@ class ParsePoseDemo:
         data_loader = WebcamLoader(self.camera_info.videoAddress).start()
         (fourcc, fps, frameSize) = data_loader.videoinfo()
 
-        print('Loading YOLO model..')
         sys.stdout.flush()
         det_loader = DetectionLoader(data_loader, batchSize=self.detbatch).start()
         det_processor = DetectionProcessor(det_loader).start()
@@ -135,11 +147,11 @@ class ParsePoseDemo:
 
         # Data writer
         # save_path = os.path.join(args.outputpath, 'AlphaPose_webcam' + webcam + '.avi')
-        if self.save_video:
-            writer = DataWriter(self.save_video, self.output_path, cv2.VideoWriter_fourcc(*'XVID'),
+
+        writer = DataWriter(self.save_video, self.output_path, cv2.VideoWriter_fourcc(*'XVID'),
                             fps, frameSize, pos_reg_model=pos_reg_model, aligner=aligner).start()
 
-        # 不明白是何用途，请添加注释
+        # 统计时间使用
         runtime_profile = {
             'dt': [],
             'pt': [],
@@ -148,14 +160,13 @@ class ParsePoseDemo:
 
         sys.stdout.flush()
         batch_size = self.detbatch
-        for i in tqdm(loop()):  # 进度显示
+        while True:
             try:
                 start_time = getTime()
                 with torch.no_grad():
                     (inps, orig_img, im_name, boxes, scores, pt1, pt2) = det_processor.read()
                     if boxes is None or boxes.nelement() == 0:
-                        if self.save_video:
-                            writer.save(None, None, None, None, None, orig_img, im_name.split('/')[-1])
+                        writer.save(None, None, None, None, None, orig_img, im_name.split('/')[-1])
                         continue
 
                     ckpt_time, det_time = getTime(start_time)
@@ -176,16 +187,21 @@ class ParsePoseDemo:
                     ckpt_time, pose_time = getTime(ckpt_time)
 
                     hm = hm.cpu().data
-                    if self.save_video:
-                        writer.save(boxes, scores, hm, pt1, pt2, orig_img, im_name.split('/')[-1])
+                    writer.save(boxes, scores, hm, pt1, pt2, orig_img, im_name.split('/')[-1])
                     while not writer.result_Q.empty():
                         boxes, classidx = writer.result_Q.get()
                         print('classidx:', classidx)
-                        pose_info = save_db(pose_info, classidx)
+
+                        for aged in self.camera.roomInfo.agesInfos:  # 遍历本摄像头所在房间的老人信息，目前只考虑房间只有一个人
+                            if not aged.id in ages.keys():
+                                ages[aged.id] = PoseInfo(agesInfoId=aged.id, date=time.strftime('%Y-%m-%dT00:00:00', time.localtime()),
+                                 timeStand=0, timeSit=0, timeLie=0, timeDown=0, timeOther=0)
+                            # 更新被监护对象各种状态的时间值
+                            pose_detect_with_video(aged.id, classidx)
+                            break
+                        # 创建或更新PoseInfo数据库记录
                         pose_url = Conf.Urls.PoseInfoUrl + '/UpdateOrCreatePoseInfo'
-                        print(pose_url)
-                        HttpHelper.create_item(pose_url, pose_info)
-                        print('ok')
+                        HttpHelper.create_item(pose_url, ages[aged.id])
 
                     ckpt_time, post_time = getTime(ckpt_time)
             except KeyboardInterrupt:
@@ -195,6 +211,10 @@ class ParsePoseDemo:
             pass
         writer.stop()
 
+
+ages = {}  # 老人字典
+# 获取或设置本机IP地址信息
+local_ip = '192.168.1.60'
 
 if __name__ == "__main__":
     # Load pose model
@@ -208,4 +228,15 @@ if __name__ == "__main__":
     pos_reg_model = NeuralNet(17 * 3 * 9).cuda()
     pos_reg_model.load_state_dict(torch.load('exps\\42_model.ckpt'))
     pos_reg_model.eval()
+
+    # 拼接url，参考接口文档
+    get_current_server_url = Conf.Urls.ServerInfoUrl + "/GetServerInfo?ip=" + local_ip
+    print(f'get {get_current_server_url}')
+
+    current_server = HttpHelper.get_items(get_current_server_url)
+    # print(current_server)
+
+    for camera in current_server.cameraInfos:  # 遍历本服务器需要处理的摄像头
+        temp_task_instance = ParsePoseDemo(camera, None, None, pose_model, pos_reg_model, False)
+        temp_task_instance.start()
     pass
